@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GameBox Player</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #000; color: #dfe4ea; font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #overlay { position: fixed; inset: 0; display: grid; place-items: center; background: #0b0e13; cursor: pointer; }
+  #overlay.hidden { display: none; }
+  #box { text-align: center; max-width: 30rem; padding: 1rem; }
+  #title { font-size: 1.4rem; font-weight: 600; margin-bottom: .5rem; }
+  #status { color: #8d98a8; min-height: 1.4em; }
+  progress { width: 18rem; margin-top: .75rem; accent-color: #1a9fff; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="overlay"><div id="box">
+  <div id="title">GameBox Player</div>
+  <div id="status">Click to start</div>
+  <progress id="progress" max="1" value="0" hidden></progress>
+</div></div>
+<script type="module">
+// Plays one packed game without the GameBox UI, for testing packs and CDN hosting.
+// ?game=portal&map=testchmb_a_00&packs=<URL of the folder holding index.json>
+import { ensureIsolation } from './isolation.js';
+import { launchEngine } from './engine-host.js';
+
+const q = new URLSearchParams(location.search);
+const game = q.get('game') || 'portal';
+// On StaticDelivr (text files only) the binary parts come from raw.githubusercontent.com at the
+// same commit: cdn.staticdelivr.com/gh/<user>/<repo>/<ref>/runtime/player.html
+const cdn = location.href.match(/^https:\/\/cdn\.staticdelivr\.com\/gh\/([^/]+)\/([^/]+)\/([^/]+)\//);
+const packs = q.get('packs')
+  || (cdn ? `https://raw.githubusercontent.com/${cdn[1]}/${cdn[2]}/${cdn[3]}/packs/` : new URL('../packs/', location.href).href);
+const overlay = document.getElementById('overlay');
+const status = document.getElementById('status');
+const progress = document.getElementById('progress');
+const canvas = document.getElementById('canvas');
+document.getElementById('title').textContent = game;
+const say = (text) => { status.textContent = text; };
+
+const isolated = await ensureIsolation('coi-sw.js');
+if (!isolated) say('This page could not be cross-origin isolated, so the engine cannot use threads.');
+
+overlay.addEventListener('click', async () => {
+  if (!isolated || overlay.dataset.started) return;
+  overlay.dataset.started = '1';
+  canvas.width = innerWidth * devicePixelRatio;
+  canvas.height = innerHeight * devicePixelRatio;
+  try {
+    const index = await (await fetch(new URL('index.json', packs), { cache: 'no-store' })).json();
+    if (!index[game]) throw new Error(`${game} isn't packed yet`);
+    // Games on other engines name their host module (runtime/<name>-host.js) in index.json.
+    const launch = index[game].runtime
+      ? (await import(new URL('../' + index[game].runtime, import.meta.url).href)).launchGame
+      : launchEngine;
+    await launch({
+      canvas,
+      packs,
+      manifest: index[game].data,
+      map: q.get('map') || undefined,
+      onStatus: say,
+      onProgress: (label, done, total) => {
+        progress.hidden = false;
+        progress.value = total ? done / total : 0;
+        say(`${label} ${done}/${total}`);
+        if (label !== 'Engine' && done === total) overlay.classList.add('hidden');
+      },
+      onMiss: (path) => console.warn('not in pack plan:', path),
+      onExit: ({ error, code }) => {
+        overlay.classList.remove('hidden');
+        say(error ? `The game stopped: ${error}` : `The game exited (${code}).`);
+      },
+    });
+    canvas.focus();
+  } catch (error) {
+    console.error(error);
+    say(error.message);
+    delete overlay.dataset.started;
+  }
+});
+</script>
+</body>
+</html>
