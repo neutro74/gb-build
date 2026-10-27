@@ -1,8 +1,67 @@
 {
  "portal": {
-  "engine": "portal/manifest-73c0ede624bb2533.json",
-  "data": "portal/manifest-73c0ede624bb2533.json",
-  "bytes": 634099289,
-  "parts": 144
+  "engine": "portal/manifest-8c25633685a13f53.json",
+  "data": "portal/manifest-8c25633685a13f53.json",
+  "bytes": 522570813,
+  "parts": 136
+ },
+ "terraria": {
+  "engine": "terraria/manifest-94b441297e209de1.json",
+  "data": "terraria/manifest-94b441297e209de1.json",
+  "bytes": 197033004,
+  "parts": 131,
+  "runtime": "runtime/terraria-host.js"
+ },
+ "deltarune": {
+  "engine": "deltarune/manifest-ef7f97c088703333.json",
+  "data": "deltarune/manifest-ef7f97c088703333.json",
+  "bytes": 700583439,
+  "parts": 543,
+  "runtime": "runtime/deltarune-host.js"
+ },
+ "hl1": {
+  "engine": "hl1/manifest-1e6fdb40f09aba00.json",
+  "data": "hl1/manifest-1e6fdb40f09aba00.json",
+  "bytes": 240217013,
+  "parts": 59,
+  "runtime": "runtime/xash-host.js"
+ },
+ "bshift": {
+  "engine": "bshift/manifest-a5863da396088fa5.json",
+  "data": "bshift/manifest-a5863da396088fa5.json",
+  "bytes": 331823338,
+  "parts": 71,
+  "runtime": "runtime/xash-host.js"
+ },
+ "opfor": {
+  "engine": "opfor/manifest-d38fb408d216dc99.json",
+  "data": "opfor/manifest-d38fb408d216dc99.json",
+  "bytes": 301331006,
+  "parts": 68,
+  "runtime": "runtime/xash-host.js"
+ },
+ "hl2": {
+  "engine": "hl2/manifest-4612e80805fdc076.json",
+  "data": "hl2/manifest-4612e80805fdc076.json",
+  "bytes": 1973402279,
+  "parts": 482
+ },
+ "ep1": {
+  "engine": "ep1/manifest-88bc685ef649926e.json",
+  "data": "ep1/manifest-88bc685ef649926e.json",
+  "bytes": 858534923,
+  "parts": 207
+ },
+ "ep2": {
+  "engine": "ep2/manifest-e155dde12bc21064.json",
+  "data": "ep2/manifest-e155dde12bc21064.json",
+  "bytes": 1724943941,
+  "parts": 418
+ },
+ "lostcoast": {
+  "engine": "lostcoast/manifest-aa99de65230c1c5d.json",
+  "data": "lostcoast/manifest-aa99de65230c1c5d.json",
+  "bytes": 223281442,
+  "parts": 60
  }
 }

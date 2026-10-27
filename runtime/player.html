@@ -3,57 +3,320 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GameBox Player</title>
+<title>GameBox</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20fill%3D%22none%22%3E%0A%20%20%3Cpath%20d%3D%22M26%209a6%206%200%200%201%2012%200v12l-6%206-6-6Z%22%20fill%3D%22%23eef1f5%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M55%2026a6%206%200%200%201%200%2012H43l-6-6%206-6Z%22%20fill%3D%22%231a9fff%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M38%2055a6%206%200%200%201-12%200V43l6-6%206%206Z%22%20fill%3D%22%23eef1f5%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M9%2038a6%206%200%200%201%200-12h12l6%206-6%206Z%22%20fill%3D%22%23eef1f5%22%2F%3E%0A%3C%2Fsvg%3E%0A">
 <style>
-  :root { color-scheme: dark; }
-  html, body { margin: 0; height: 100%; background: #000; color: #dfe4ea; font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  :root { color-scheme: dark; --accent: #1a9fff; --text: #eef1f5; --muted: #8d98a8; --bg: #0b0e13; --ease: cubic-bezier(0.2, 0.8, 0.2, 1); }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--text); font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
-  #overlay { position: fixed; inset: 0; display: grid; place-items: center; background: #0b0e13; cursor: pointer; }
-  #overlay.hidden { display: none; }
-  #box { text-align: center; max-width: 30rem; padding: 1rem; }
-  #title { font-size: 1.4rem; font-weight: 600; margin-bottom: .5rem; }
-  #status { color: #8d98a8; min-height: 1.4em; }
-  progress { width: 18rem; margin-top: .75rem; accent-color: #1a9fff; }
+
+  #loader { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); transition: opacity 0.6s var(--ease); z-index: 10; }
+  #loader.done { opacity: 0; pointer-events: none; }
+  #art { position: absolute; inset: -4%; background: center / cover no-repeat; filter: blur(22px) brightness(0.55) saturate(1.1); transform: scale(1.05); opacity: 0; transition: opacity 0.8s var(--ease); }
+  #art.shown { opacity: 1; }
+  #loader::after { content: ''; position: absolute; inset: 0; background: radial-gradient(90% 90% at 50% 45%, transparent, rgba(0, 0, 0, 0.7)); pointer-events: none; }
+
+  #card { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; width: min(28rem, 82vw); text-align: center; animation: rise 0.6s var(--ease) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  #logo { max-width: 100%; max-height: 28vh; object-fit: contain; filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.5)); }
+  #name { font-size: 2rem; font-weight: 700; letter-spacing: 0.02em; }
+  #chapter { margin-top: 0.6rem; font-size: 1rem; opacity: 0.85; min-height: 1.4em; }
+
+  #progress { margin-top: 2.2rem; width: 100%; }
+  #track { position: relative; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+  #fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--accent); box-shadow: 0 0 12px var(--accent); transition: width 0.35s var(--ease); }
+  #track.waiting #fill { width: 30% !important; animation: sweep 1.4s ease-in-out infinite; }
+  @keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+  #meta { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.6rem; font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #step { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  #error { display: none; margin-top: 1.6rem; color: #ffb3b3; font-size: 0.9rem; line-height: 1.5; }
+  #actions { display: none; gap: 0.75rem; margin-top: 1.2rem; }
+  .failed #error { display: block; }
+  .failed #actions { display: flex; }
+  .failed #progress { display: none; }
+  button { font: inherit; font-weight: 600; color: #fff; border: 0; border-radius: 6px; padding: 0.6rem 1.2rem; cursor: pointer; background: rgba(255, 255, 255, 0.1); }
+  button.primary { background: var(--accent); }
+  button:hover { filter: brightness(1.12); }
+  #log { margin-top: 1rem; max-height: 30vh; overflow: auto; text-align: left; white-space: pre-wrap; font: 11px/1.35 ui-monospace, monospace; color: var(--muted); display: none; }
+  .failed #log:not(:empty) { display: block; }
+
+  #brand { position: absolute; left: 1.4rem; bottom: 1.1rem; z-index: 1; display: flex; align-items: center; gap: 0.6rem; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.22em; color: var(--muted); }
+  #brand svg { width: 1.7rem; height: 1.7rem; flex: none; overflow: visible; filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5)); }
+  #brand b { color: var(--text); font-weight: 700; }
+  #sound { position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 5; padding: 0.5rem 0.9rem; border-radius: 99px; background: rgba(9, 11, 15, 0.8); color: var(--text); font-size: 0.82rem; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+  #sound.shown { opacity: 1; }
+  #unlock { position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 6; display: flex; align-items: center; gap: 0.75rem; max-width: min(22rem, 80vw); padding: 0.7rem 1rem 0.7rem 0.8rem; border-radius: 10px; background: rgba(9, 11, 15, 0.88); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08); pointer-events: none; opacity: 0; transform: translateY(0.6rem); transition: opacity 0.35s var(--ease), transform 0.35s var(--ease); }
+  #unlock.shown { opacity: 1; transform: none; }
+  #unlock svg { flex: none; width: 1.6rem; height: 1.6rem; color: var(--accent); }
+  #unlock small { display: block; color: var(--muted); font-size: 0.75rem; }
+  #unlock strong { display: block; font-size: 0.92rem; }
 </style>
 </head>
 <body>
 <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
-<div id="overlay"><div id="box">
-  <div id="title">GameBox Player</div>
-  <div id="status">Click to start</div>
-  <progress id="progress" max="1" value="0" hidden></progress>
-</div></div>
+<div id="loader">
+  <div id="art"></div>
+  <div id="card">
+    <img id="logo" alt="" hidden>
+    <div id="name" hidden></div>
+    <div id="chapter"></div>
+    <div id="progress">
+      <div id="track" class="waiting"><div id="fill"></div></div>
+      <div id="meta"><span id="step">Starting</span><span id="percent"></span></div>
+    </div>
+    <div id="error"></div>
+    <div id="actions">
+      <button class="primary" onclick="location.reload()">Try again</button>
+      <button onclick="leave()">Back to GameBox</button>
+    </div>
+    <div id="log"></div>
+  </div>
+  <div id="brand">
+    <!-- Same mark as ui/src/assets/gamebox-symbol.svg; the accent follows the launched theme. -->
+    <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M26 9a6 6 0 0 1 12 0v12l-6 6-6-6Z" fill="currentColor"/>
+      <path d="M55 26a6 6 0 0 1 0 12H43l-6-6 6-6Z" fill="var(--accent)"/>
+      <path d="M38 55a6 6 0 0 1-12 0V43l6-6 6 6Z" fill="currentColor"/>
+      <path d="M9 38a6 6 0 0 1 0-12h12l6 6-6 6Z" fill="currentColor"/>
+    </svg>
+    <span>GAME<b>BOX</b></span>
+  </div>
+</div>
+<div id="sound">Click or press a key to turn on sound</div>
+<div id="unlock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><div><small>Achievement unlocked</small><strong id="unlock-name"></strong></div></div>
 <script type="module">
-// Plays one packed game without the GameBox UI, for testing packs and CDN hosting.
-// ?game=portal&map=testchmb_a_00&packs=<URL of the folder holding index.json>
+// Plays one packed game. GameBox's play page opens it with ?game=<id>[&map=<map>]&args=[...] after storing
+// the launch art in sessionStorage ('gamebox.launch'); a direct link works too, just without the art.
+// ?packs=<URL of the folder holding index.json> overrides where packs come from.
 import { ensureIsolation } from './isolation.js';
 import { launchEngine } from './engine-host.js';
+import { createActivityTracker } from './activity.js';
+import { createTabCloak } from './cloak.js';
+import { installPlayerUI } from './player-ui-host.js';
+
+// Games (SDL relative mouse mode especially) ask for pointer lock every frame, which grabs the mouse
+// back the moment the player lets go of it with Esc. Only a click on the game takes it.
+{
+  const requestPointerLock = Element.prototype.requestPointerLock;
+  let clickedAt = -Infinity;
+  addEventListener('pointerdown', (e) => { if (e.target instanceof HTMLCanvasElement) clickedAt = performance.now(); }, true);
+  Element.prototype.requestPointerLock = function (...a) {
+    if (document.pointerLockElement === this || performance.now() - clickedAt > 1000) return Promise.resolve();
+    clickedAt = -Infinity;
+    const result = requestPointerLock.apply(this, a);
+    result?.catch?.(() => {});
+    return result;
+  };
+}
 
 const q = new URLSearchParams(location.search);
 const game = q.get('game') || 'portal';
+
+// Unlock notices, one at a time. Names come from the catalog the library uses.
+{
+  const queue = [];
+  let names, showing = false;
+  const next = async () => {
+    if (showing || !queue.length) return;
+    showing = true;
+    names ??= await fetch(new URL('achievements.json', import.meta.url)).then((r) => r.json()).catch(() => ({}));
+    $('unlock-name').textContent = names[game]?.[queue.shift()] ?? 'New achievement';
+    $('unlock').classList.add('shown');
+    setTimeout(() => { $('unlock').classList.remove('shown'); setTimeout(() => { showing = false; next(); }, 400); }, 4500);
+  };
+  addEventListener('gamebox-achievement', (e) => { if (e.detail.game === game) { queue.push(...e.detail.ids); next(); } });
+}
+const activity = createActivityTracker(game, { map: q.get('map') || undefined });
+let running = false;
+function recordRunning() {
+  if (stopped || running) return;
+  running = true;
+  activity.start();
+  if (document.hidden) activity.pause();
+}
+setInterval(() => { if (running && !document.hidden) activity.checkpoint(); }, 5000);
+addEventListener('visibilitychange', () => document.hidden ? activity.pause() : activity.resume());
+addEventListener('pagehide', (e) => e.persisted ? activity.pause() : activity.stop());
+addEventListener('pageshow', (e) => { if (e.persisted && !document.hidden) activity.resume(); });
 // On StaticDelivr (text files only) the binary parts come from raw.githubusercontent.com at the
 // same commit: cdn.staticdelivr.com/gh/<user>/<repo>/<ref>/runtime/player.html
 const cdn = location.href.match(/^https:\/\/cdn\.staticdelivr\.com\/gh\/([^/]+)\/([^/]+)\/([^/]+)\//);
 const packs = q.get('packs')
   || (cdn ? `https://raw.githubusercontent.com/${cdn[1]}/${cdn[2]}/${cdn[3]}/packs/` : new URL('../packs/', location.href).href);
-const overlay = document.getElementById('overlay');
-const status = document.getElementById('status');
-const progress = document.getElementById('progress');
-const canvas = document.getElementById('canvas');
-document.getElementById('title').textContent = game;
-const say = (text) => { status.textContent = text; };
 
-const isolated = await ensureIsolation('coi-sw.js');
-if (!isolated) say('This page could not be cross-origin isolated, so the engine cannot use threads.');
+const $ = (id) => document.getElementById(id);
+const canvas = $('canvas');
 
-overlay.addEventListener('click', async () => {
-  if (!isolated || overlay.dataset.started) return;
-  overlay.dataset.started = '1';
+// Launch art from GameBox.
+let info = null;
+try { info = JSON.parse(sessionStorage.getItem('gamebox.launch') || 'null'); } catch {}
+if (info?.accent) document.documentElement.style.setProperty('--accent', info.accent);
+if (info?.background) {
+  const img = new Image();
+  img.onload = () => { $('art').style.backgroundImage = `url(${info.background})`; $('art').classList.add('shown'); };
+  img.src = info.background;
+}
+if (info?.logo) { $('logo').src = info.logo; $('logo').hidden = false; }
+else { $('name').textContent = info?.name || game.replace(/^\w/, (c) => c.toUpperCase()); $('name').hidden = false; }
+$('chapter').textContent = info?.chapter || '';
+document.title = info?.name ? `${info.name} · GameBox` : 'GameBox';
+const tabCloak = createTabCloak();
+const refreshCloak = () => {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem('gamebox.settings.v1') || '{}'); } catch {}
+  tabCloak.update(saved?.cloak);
+};
+addEventListener('gamebox-preview-cloak', () => tabCloak.preview());
+refreshCloak();
+addEventListener('storage', refreshCloak);
+addEventListener('pageshow', refreshCloak);
+addEventListener('focus', refreshCloak);
+
+// Recent log lines and device facts, sent back to the test server (tools/serve-packs.mjs) when the
+// game stops, since a Chromebook's console isn't easy to read.
+const lines = [];
+const started = performance.now();
+const firstLines = [];
+function log(text) {
+  if (firstLines.length < 300) firstLines.push(`${((performance.now() - started) / 1000).toFixed(1).padStart(7)} ${text}`);
+  lines.push(`${((performance.now() - started) / 1000).toFixed(1).padStart(7)} ${text}`);
+  if (lines.length > 5000) lines.splice(0, lines.length - 5000);
+}
+for (const level of ['warn', 'error']) {
+  const orig = console[level].bind(console);
+  console[level] = (...a) => { log(`[${level}] ${a.map(String).join(' ')}`); orig(...a); };
+}
+addEventListener('pagehide', () => sendReport('left the page'));
+addEventListener('error', (e) => log(`[page error] ${e.message} ${e.filename}:${e.lineno}`));
+addEventListener('unhandledrejection', (e) => log(`[rejection] ${e.reason?.stack || e.reason}`));
+
+function device() {
+  let gpu = '';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  } catch {}
+  const mem = performance.memory;
+  return [
+    `agent ${navigator.userAgent}`,
+    `memory ${navigator.deviceMemory ?? '?'} GB, cores ${navigator.hardwareConcurrency}, gpu ${gpu}`,
+    `isolated ${crossOriginIsolated}, heap ${mem ? Math.round(mem.usedJSHeapSize / 1e6) + '/' + Math.round(mem.jsHeapSizeLimit / 1e6) + ' MB' : '?'}`,
+    `url ${location.href}`,
+  ].join('\n');
+}
+
+async function sendReport(reason) {
+  // keepalive requests (the only kind that survive leaving the page) are capped at 64 KB.
+  const head = `${reason}\n${device()}\n\n`;
+  // The start (engine and map setup) and as much of the end as fits.
+  const start = firstLines.join('\n');
+  let keep = lines.length;
+  let size = head.length + start.length;
+  while (keep > 0 && size + lines[keep - 1].length + 1 < 60000) size += lines[--keep].length + 1;
+  const body = `${head}${start}\n...\n${lines.slice(keep).join('\n')}\n`;
+  try {
+    await fetch(new URL('../report', location.href), { method: 'POST', body, keepalive: true });
+  } catch {}
+}
+
+// Browsers keep audio off until the page gets a click or key press. Loading starts right away, so
+// audio contexts the engines create are resumed on the first input instead.
+const contexts = [];
+const NativeAudioContext = globalThis.AudioContext;
+if (NativeAudioContext) {
+  globalThis.AudioContext = class extends NativeAudioContext {
+    constructor(...a) { super(...a); contexts.push(this); }
+  };
+  globalThis.webkitAudioContext = globalThis.AudioContext;
+}
+const unlock = () => {
+  for (const c of contexts) if (c.state === 'suspended') c.resume().catch(() => {});
+  $('sound').classList.remove('shown');
+};
+for (const type of ['pointerdown', 'keydown', 'touchstart']) addEventListener(type, unlock, { capture: true });
+
+const playerUI = installPlayerUI({
+  canvas, game, name: info?.name || game,
+  AudioContext: NativeAudioContext,
+  onSettings: refreshCloak,
+  onLeave(destination) {
+    if (destination.name === 'play') { activity.stop(); location.reload(); return; }
+    activity.stop(); stopped = finished = true;
+    const hash = destination.name === 'game' ? `#/game/${destination.id}` : destination.name === 'library' ? '#/library' : '#/';
+    location.href = new URL(`../GameBox.html${hash}`, location.href).href;
+  },
+});
+
+// One bar across the stages: engine download, shared files, then the level itself.
+const STAGES = { Engine: [0, 0.4], base: [0.4, 0.55] };
+let lastLevel = '';
+function progress(label, done, total) {
+  const frac = total ? done / total : 0;
+  const [from, to] = STAGES[label] ?? [0.55, 1];
+  const overall = from + (to - from) * frac;
+  $('track').classList.remove('waiting');
+  $('fill').style.width = `${(overall * 100).toFixed(1)}%`;
+  $('percent').textContent = `${Math.round(overall * 100)}%`;
+  $('step').textContent = label === 'Engine' ? 'Downloading the engine'
+    : label === 'base' ? 'Loading game files'
+    : `Loading ${lastLevel || label}`;
+  if (!STAGES[label] && total > 0 && done === total) {
+    if (lastLevel) activity.setMap(lastLevel);
+    finish();
+  }
+}
+function status(text) {
+  log(`[status] ${text}`);
+  const level = text.match(/^Loading (\S+)$/)?.[1];
+  if (level) lastLevel = level;
+  if (!/^\w+ \d+\/\d+$/.test(text)) $('step').textContent = text;
+}
+
+let finished = false;
+function finish() {
+  recordRunning();
+  if (finished) return;
+  finished = true;
+  $('fill').style.width = '100%';
+  $('percent').textContent = '100%';
+  setTimeout(() => {
+    $('loader').classList.add('done');
+    if (!playerUI.isOpen()) canvas.focus();
+    if (contexts.some((c) => c.state === 'suspended')) $('sound').classList.add('shown');
+  }, 350);
+}
+
+function leave() {
+  activity.stop();
+  stopped = finished = true;
+  if (history.length > 1) history.back();
+  else location.href = '../GameBox.html';
+}
+window.leave = leave;
+
+let stopped = false;
+function fail(message) {
+  activity.stop();
+  if (stopped) return log(`[after stop] ${message}`);
+  stopped = true;
+  finished = true;
+  $('loader').classList.remove('done');
+  $('card').classList.add('failed');
+  $('error').textContent = message;
+  $('log').textContent = lines.slice(-25).join('\n');
+}
+
+(async () => {
+  const isolated = await ensureIsolation('coi-sw.js');
+  if (!isolated) return fail('This page could not be cross-origin isolated, so the game cannot use threads.');
   canvas.width = innerWidth * devicePixelRatio;
   canvas.height = innerHeight * devicePixelRatio;
   try {
+    status('Reading game list');
     const index = await (await fetch(new URL('index.json', packs), { cache: 'no-store' })).json();
-    if (!index[game]) throw new Error(`${game} isn't packed yet`);
+    if (!index[game]) throw new Error(`${info?.name || game} isn't packed yet.`);
     // Games on other engines name their host module (runtime/<name>-host.js) in index.json.
     const launch = index[game].runtime
       ? (await import(new URL('../' + index[game].runtime, import.meta.url).href)).launchGame
@@ -63,26 +326,31 @@ overlay.addEventListener('click', async () => {
       packs,
       manifest: index[game].data,
       map: q.get('map') || undefined,
-      onStatus: say,
-      onProgress: (label, done, total) => {
-        progress.hidden = false;
-        progress.value = total ? done / total : 0;
-        say(`${label} ${done}/${total}`);
-        if (label !== 'Engine' && done === total) overlay.classList.add('hidden');
-      },
+      args: (() => { try { return JSON.parse(q.get('args') || '[]'); } catch { return []; } })(),
+      onStatus: status,
+      onReady: recordRunning,
+      // A main menu without a background level (HL2 with -console) never reports a level load.
+      onEngineUp: () => setTimeout(() => { if (!/^(|engine)$/.test(lastLevel)) return; finish(); }, 3000),
+      onProgress: progress,
       onMiss: (path) => console.warn('not in pack plan:', path),
+      print: (...a) => log(a.join(' ')),
       onExit: ({ error, code }) => {
-        overlay.classList.remove('hidden');
-        say(error ? `The game stopped: ${error}` : `The game exited (${code}).`);
+        // Quitting from the game's own menu goes back to GameBox.
+        if (!error && !code) return leave();
+        const message = error ? `The game stopped: ${error}` : `The game exited (${code}).`;
+        sendReport(error ? `stopped: ${error}` : `exited ${code}`);
+        fail(message);
       },
     });
-    canvas.focus();
+    // Other engines' hosts resolve once their game is running; Source reports its first level instead.
+    if (index[game].runtime) finish();
+    setTimeout(() => sendReport('running 90 s'), 90000);
   } catch (error) {
     console.error(error);
-    say(error.message);
-    delete overlay.dataset.started;
+    sendReport(`launch failed: ${error.message}`);
+    fail(error.message);
   }
-});
+})();
 </script>
 </body>
 </html>

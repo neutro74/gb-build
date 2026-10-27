@@ -6,6 +6,8 @@
 //
 // The page must be cross-origin isolated (the engine uses threads); see coi-sw.js.
 
+import { attachSourceAchievements } from './activity.js';
+
 const CACHE = 'gamebox-parts-v1';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -110,6 +112,25 @@ async function loadFiles(manifest, store, ids, onProgress) {
   return ids.map((id) => sliceFile(manifest, manifest.files[id], parts));
 }
 
+// ['-dev', '+sensitivity', '3', '+bind', 'f', '"impulse 100"'] -> params ['-dev'] and a cfg with
+// one line per +command ("sensitivity 3", 'bind f "impulse 100"'). Values with spaces get quoted.
+function splitArgs(args) {
+  const params = [];
+  const lines = [];
+  let line = null;
+  for (const arg of args) {
+    if (arg.startsWith('+')) {
+      line = [arg.slice(1)];
+      lines.push(line);
+    } else if (line) {
+      line.push(/\s/.test(arg) && !/^".*"$/.test(arg) ? `"${arg}"` : arg);
+    } else {
+      params.push(arg);
+    }
+  }
+  return { params, cfg: lines.length ? lines.map((l) => l.join(' ')).join('\n') + '\n' : '' };
+}
+
 export async function launchEngine({
   canvas,
   packs,
@@ -120,6 +141,8 @@ export async function launchEngine({
   onStatus,
   onMiss,
   onExit,
+  onReady,
+  onEngineUp,
   print = (...a) => console.log(...a),
 }) {
   if (!crossOriginIsolated) throw new Error('This page is not cross-origin isolated, so the engine cannot use threads.');
@@ -139,7 +162,10 @@ export async function launchEngine({
     else urls[name] = URL.createObjectURL(new Blob([binaries[i]], { type: name.endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream' }));
   });
 
-  const fullArgs = [...args, ...(map ? ['+map', map] : [])];
+  // Settings go into cfg/gamebox.cfg instead of the command line: the engine stops starting up
+  // once there are more than about two dozen +commands. -params stay on the command line.
+  const { params, cfg } = splitArgs(args);
+  const fullArgs = [...params, ...(cfg ? ['+exec', 'gamebox'] : []), ...(map ? ['+map', map] : [])];
   // The worker copy carries only JSON-safe fields; functions stay on the main thread.
   const shared = { game: manifest.mod, args: fullArgs, manifest };
   globalThis.gbConfig = {
@@ -148,6 +174,12 @@ export async function launchEngine({
     onProgress,
     onStatus,
     onMiss,
+    // Fatal engine errors arrive here before the engine thread exits.
+    onFatal: (message) => onExit?.({ error: message }),
+    // The player chose Quit; saves are already flushed.
+    onQuit: () => onExit?.({ code: 0 }),
+    // The engine ran its first frame: the main menu is up even if no level loads behind it.
+    onEngineUp: () => onEngineUp?.(),
   };
 
   const worker = new Blob([`self.gbConfig = ${JSON.stringify(shared)};\n`, engineJs], { type: 'text/javascript' });
@@ -161,6 +193,15 @@ export async function launchEngine({
     setStatus: () => {},
     onAbort: (what) => onExit?.({ error: String(what) }),
     onExit: (code) => onExit?.({ code }),
+    onRuntimeInitialized: () => onReady?.(),
+    // The engine script declares FS globally; this runs before main(), ahead of the pack loader.
+    preRun: [() => {
+      const achievements = attachSourceAchievements(globalThis.FS, manifest.game, manifest.mod);
+      addEventListener('pagehide', () => achievements.capture());
+      if (!cfg) return;
+      globalThis.FS.mkdirTree(`/${manifest.mod}/cfg`);
+      globalThis.FS.writeFile(`/${manifest.mod}/cfg/gamebox.cfg`, cfg);
+    }],
   };
 
   const script = document.createElement('script');
