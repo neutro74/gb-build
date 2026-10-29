@@ -20,23 +20,23 @@
   "runtime": "runtime/deltarune-host.js"
  },
  "hl1": {
-  "engine": "hl1/manifest-1e6fdb40f09aba00.json",
-  "data": "hl1/manifest-1e6fdb40f09aba00.json",
-  "bytes": 240217013,
+  "engine": "hl1/manifest-a6350bd73a3affb6.json",
+  "data": "hl1/manifest-a6350bd73a3affb6.json",
+  "bytes": 240214477,
   "parts": 59,
   "runtime": "runtime/xash-host.js"
  },
  "bshift": {
-  "engine": "bshift/manifest-a5863da396088fa5.json",
-  "data": "bshift/manifest-a5863da396088fa5.json",
-  "bytes": 331823338,
+  "engine": "bshift/manifest-c75e17c8e0796ab5.json",
+  "data": "bshift/manifest-c75e17c8e0796ab5.json",
+  "bytes": 331820805,
   "parts": 71,
   "runtime": "runtime/xash-host.js"
  },
  "opfor": {
-  "engine": "opfor/manifest-d38fb408d216dc99.json",
-  "data": "opfor/manifest-d38fb408d216dc99.json",
-  "bytes": 301331006,
+  "engine": "opfor/manifest-8f43b0f3d49e9e02.json",
+  "data": "opfor/manifest-8f43b0f3d49e9e02.json",
+  "bytes": 301329396,
   "parts": 68,
   "runtime": "runtime/xash-host.js"
  },
